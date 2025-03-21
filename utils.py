@@ -18,8 +18,12 @@ def print_stocks_down(stocks):
 
 def display_buy_candidates(signals):
     """Displays the top 10 buy candidates in a Streamlit app."""
-    st.subheader("🚀 Top 10 Buy Candidates")
-    sorted_signals = sorted(signals, key=lambda x: x['Distance%'])
+    st.subheader("🚀 Top 10 Buy Candidates (Sorted by Strength)")
+    
+    # Sort first by Strength (highest first), then by Distance% (lowest first)
+    sorted_signals = sorted(signals, key=lambda x: (-x['Strength'], x['Distance%']))
+    
+    # Select the top 10 candidates after sorting
     top_candidates = sorted_signals[:10]
     
     if top_candidates:
@@ -28,3 +32,4 @@ def display_buy_candidates(signals):
         st.dataframe(df)
     else:
         st.write("No buy candidates found.")
+
