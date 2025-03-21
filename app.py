@@ -3,18 +3,15 @@ import pandas as pd
 import datetime
 import os
 from alice_client import initialize_alice, save_credentials, load_credentials
-from stock_analysis import get_stocks_3_to_5_percent_up, get_stocks_3_to_5_percent_down
+from stock_analysis import analyze_all_tokens, fetch_stock_data_up, fetch_stock_data_down  # Import your analysis functions
 from stock_lists import STOCK_LISTS
 
 st.set_page_config(page_title="Stock Screener", layout="wide")
-# Add compatibility warning
 st.warning("This application is best compatible with **Google Chrome**.")
-
 
 # Try loading stored credentials
 user_id, api_key = load_credentials()
 
-# If no credentials are stored, ask the first user to enter them
 if not user_id or not api_key:
     st.title("Admin Login - Enter AliceBlue API Credentials")
     new_user_id = st.text_input("Enter User ID", type="password")  # Hide input
@@ -23,38 +20,54 @@ if not user_id or not api_key:
     if st.button("Login"):
         save_credentials(new_user_id, new_api_key)
         st.success("API credentials saved! Refreshing...")
-        st.rerun()  # Refresh the app to hide inputs
+        st.rerun()
 
-# Initialize AliceBlue API
 try:
     alice = initialize_alice()
 except Exception as e:
     st.error(f"Failed to initialize AliceBlue API: {e}")
     alice = None
 
+
 @st.cache_data(ttl=300)
-def fetch_stocks(tokens):
+def fetch_screened_stocks(tokens, strategy):
+    """Fetch and analyze stocks based on selected strategy."""
     try:
         if not alice:
             raise Exception("AliceBlue API is not initialized.")
-        up_stocks = get_stocks_3_to_5_percent_up(alice, tokens)
-        down_stocks = get_stocks_3_to_5_percent_down(alice, tokens)
-        return up_stocks, down_stocks
+        
+        if strategy == "3-5% Gainers":
+            return fetch_stock_data_up(alice, tokens)
+        elif strategy == "3-5% Losers":
+            return fetch_stock_data_down(alice, tokens)
+        elif strategy == "EMA, RSI & Support Zone":
+            return analyze_all_tokens(alice, tokens)
     except Exception as e:
         st.error(f"Error fetching stock data: {e}")
-        return [], []
+        return []
 
-def clean_data(data):
+
+def clean_and_display_data(data, strategy):
     if not data or not isinstance(data, list):
-        return pd.DataFrame(columns=["Name", "Token", "Close", "Change (%)"])
-    try:
+        return pd.DataFrame()
+
+    if strategy in ["3-5% Gainers", "3-5% Losers"]:
         df = pd.DataFrame(data)
         df["Close"] = df["Close"].astype(float).round(2)
         df["Change (%)"] = df["Change (%)"].astype(float).round(2)
-        return df
-    except Exception as e:
-        st.error(f"Error processing stock data: {e}")
-        return pd.DataFrame(columns=["Name", "Token", "Close", "Change (%)"])
+    else:
+        df = pd.DataFrame(data)
+        df["Price"] = df["Price"].astype(float).round(2)
+        df["Support"] = df["Support"].astype(float).round(2)
+        df["Distance%"] = df["Distance%"].astype(float).round(2)
+        df["RSI"] = df["RSI"].astype(float).round(2)
+
+    search = st.text_input("Search Stocks:", "").upper()
+    if search:
+        df = df[df["Name"].str.contains(search, na=False, regex=False)]
+    
+    return df
+
 
 def safe_display(df, title):
     if df.empty:
@@ -63,19 +76,17 @@ def safe_display(df, title):
         st.markdown(f"## {title}")
         st.dataframe(df)
 
+
 st.title("Stock Screener")
 
 selected_list = st.selectbox("Select Stock List:", list(STOCK_LISTS.keys()))
-strategy = st.selectbox("Select Strategy:", ["Bullish Stocks", "Bearish Stocks"])
+strategy = st.selectbox("Select Strategy:", ["3-5% Gainers", "3-5% Losers", "EMA, RSI & Support Zone"])
 
 if st.button("Start Screening"):
     tokens = STOCK_LISTS.get(selected_list, [])
     if not tokens:
         st.warning(f"No stocks found for {selected_list}.")
     else:
-        stocks_up, stocks_down = fetch_stocks(tokens)
-        df = clean_data(stocks_up if strategy == "Bullish Stocks" else stocks_down)
-        search = st.text_input("Search Stocks:").upper()
-        if search:
-            df = df[df["Name"].str.contains(search, na=False, regex=False)]
+        screened_stocks = fetch_screened_stocks(tokens, strategy)
+        df = clean_and_display_data(screened_stocks, strategy)
         safe_display(df, strategy)
