@@ -1,0 +1,8 @@
+# .streamlit/config.toml
+[theme]
+base = "dark"
+primaryColor = "#4CAF50"  # Optional, change button color
+backgroundColor = "#0E1117"  # Background color
+secondaryBackgroundColor = "#262730"  # Sidebar color
+textColor = "#FAFAFA"  # Text color
+font = "sans serif"  # Font family
