@@ -15,3 +15,16 @@ def print_stocks_down(stocks):
     for stock in stocks:
         print(f"{stock['Name']:<20} {stock['Token']:<10} {stock['Close']:<10.2f} {stock['Change (%)']:<10.2f}")
     print('-' * 50)
+
+def display_buy_candidates(signals):
+    """Displays the top 10 buy candidates in a Streamlit app."""
+    st.subheader("🚀 Top 10 Buy Candidates")
+    sorted_signals = sorted(signals, key=lambda x: x['Distance%'])
+    top_candidates = sorted_signals[:10]
+    
+    if top_candidates:
+        df = pd.DataFrame(top_candidates)
+        df = df[['Name', 'Price', 'Support', 'Strength', 'Distance%', 'RSI', 'Trend']]
+        st.dataframe(df)
+    else:
+        st.write("No buy candidates found.")
