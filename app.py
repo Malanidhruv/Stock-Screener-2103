@@ -114,6 +114,6 @@ if st.button("Start Screening"):
                 df["Support"] = df["Support"].astype(float).round(2)
                 df["Distance%"] = df["Distance%"].astype(float).round(2)
                 df["RSI"] = df["RSI"].astype(float).round(2)
-                safe_display(df, "Top Buy Candidates (Stocks showing higher strength may be more likely to rise, but this is not a guarantee.)")
+                safe_display(df, "Top Buy Candidates)")
             else:
                 st.warning("No stocks found for EMA, RSI & Support Zone strategy.")
