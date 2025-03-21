@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import datetime
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from alice_client import initialize_alice, save_credentials, load_credentials
 from stock_analysis import analyze_all_tokens, fetch_stock_data_up, fetch_stock_data_down  # Import your analysis functions
 from stock_lists import STOCK_LISTS
@@ -31,19 +32,25 @@ except Exception as e:
 
 @st.cache_data(ttl=300)
 def fetch_screened_stocks(tokens, strategy):
-    """Fetch and analyze stocks based on selected strategy."""
+    """Fetch and analyze stocks based on selected strategy concurrently."""
     try:
         if not alice:
             raise Exception("AliceBlue API is not initialized.")
         
         if strategy == "3-5% Gainers":
-            # Process each token individually and collect non-None results
-            results = [fetch_stock_data_up(alice, token) for token in tokens]
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                futures = {executor.submit(fetch_stock_data_up, alice, token): token for token in tokens}
+                results = [future.result() for future in as_completed(futures)]
             return [res for res in results if res is not None]
+
         elif strategy == "3-5% Losers":
-            results = [fetch_stock_data_down(alice, token) for token in tokens]
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                futures = {executor.submit(fetch_stock_data_down, alice, token): token for token in tokens}
+                results = [future.result() for future in as_completed(futures)]
             return [res for res in results if res is not None]
+
         elif strategy == "EMA, RSI & Support Zone":
+            # analyze_all_tokens already uses threading
             return analyze_all_tokens(alice, tokens)
     except Exception as e:
         st.error(f"Error fetching stock data: {e}")
@@ -91,10 +98,10 @@ if st.button("Start Screening"):
     if not tokens:
         st.warning(f"No stocks found for {selected_list}.")
     else:
-        screened_stocks = fetch_screened_stocks(tokens, strategy)
+        with st.spinner("Fetching and analyzing stocks..."):
+            screened_stocks = fetch_screened_stocks(tokens, strategy)
         
         if strategy in ["3-5% Gainers", "3-5% Losers"]:
-            # Standard cleaning and display for gainers/losers
             df = clean_and_display_data(screened_stocks, strategy)
             safe_display(df, strategy)
         elif strategy == "EMA, RSI & Support Zone":
