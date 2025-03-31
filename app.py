@@ -72,10 +72,7 @@ def clean_and_display_data(data, strategy):
         df["Distance%"] = df["Distance%"].astype(float).round(2)
         df["RSI"] = df["RSI"].astype(float).round(2)
     
-    search = st.text_input("Search Stocks:", "").upper()
-    if search and "Name" in df.columns:
-        df = df[df["Name"].str.contains(search, na=False, regex=False)]
-    
+   
     return df
 
 
