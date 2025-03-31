@@ -2,8 +2,8 @@ import streamlit as st
 import pandas as pd
 
 def generate_tradingview_link(stock_name):
-    """Generate a separate '📈 View Chart' button for each stock."""
-    return f'<a href="https://in.tradingview.com/chart?symbol=NSE%3A{stock_name}" target="_blank">📈 View Chart</a>'
+    """Generate a TradingView link for a given stock."""
+    return f'<a href="https://in.tradingview.com/chart?symbol=NSE%3A{stock_name}" target="_blank">{stock_name}</a>'
 
 def print_stocks_up(stocks):
     """Prints the stocks that gained 3-5% with TradingView links."""
@@ -30,7 +30,7 @@ def print_stocks_down(stocks):
     print('-' * 50)
 
 def display_buy_candidates(signals):
-    """Displays the top 10 buy candidates in a Streamlit app with a separate 'View Chart' button."""
+    """Displays the top 10 buy candidates in a Streamlit app with clickable links."""
     st.subheader("🚀 Top 10 Buy Candidates (Sorted by Strength)")
     
     # Sort first by Strength (highest first), then by Distance% (lowest first)
@@ -41,12 +41,12 @@ def display_buy_candidates(signals):
     
     if top_candidates:
         df = pd.DataFrame(top_candidates)
-
-        # Add a "📈 View Chart" link instead of embedding the hyperlink in the stock name
-        df['View Chart'] = df['Name'].apply(generate_tradingview_link)
+        
+        # Apply the function to create hyperlinks
+        df['Name'] = df['Name'].apply(generate_tradingview_link)
 
         # Select relevant columns
-        df = df[['Name', 'Price', 'Support', 'Strength', 'Distance%', 'RSI', 'Trend', 'View Chart']]
+        df = df[['Name', 'Price', 'Support', 'Strength', 'Distance%', 'RSI', 'Trend']]
         
         # Display dataframe with HTML rendering enabled
         st.markdown(df.to_html(escape=False), unsafe_allow_html=True)
