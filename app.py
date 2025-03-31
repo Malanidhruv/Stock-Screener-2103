@@ -80,18 +80,18 @@ def clean_and_display_data(data, strategy):
 
 
 def safe_display(df, title):
-    """Displays the stock data with clickable TradingView links."""
+    """Displays the stock data with clickable TradingView links and a View Chart button."""
     if df.empty:
         st.warning(f"No stocks found for {title}")
     else:
         st.markdown(f"## {title}")
         
-        # Convert 'Name' column into clickable TradingView links
-        if "Name" in df.columns:
-            df["Name"] = df["Name"].apply(lambda x: f'<a href="https://in.tradingview.com/chart?symbol=NSE%3A{x}" target="_blank">{x}</a>')
-        
-        # Render the DataFrame with clickable links
-        st.markdown(df.to_html(escape=False), unsafe_allow_html=True)
+        # Render the DataFrame with View Chart button
+        for index, row in df.iterrows():
+            stock_name = row["Name"]
+            tradingview_link = f"https://in.tradingview.com/chart?symbol=NSE%3A{stock_name}"
+            st.markdown(f"**{stock_name}**")
+            st.markdown(f'<a href="{tradingview_link}" target="_blank"><button>View Chart 📈</button></a>', unsafe_allow_html=True)
 
 
 st.title("Stock Screener")
