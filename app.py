@@ -72,7 +72,10 @@ def clean_and_display_data(data, strategy):
         df["Distance%"] = df["Distance%"].astype(float).round(2)
         df["RSI"] = df["RSI"].astype(float).round(2)
     
-   
+    search = st.text_input("Search Stocks:", "").upper()
+    if search and "Name" in df.columns:
+        df = df[df["Name"].str.contains(search, na=False, regex=False)]
+    
     return df
 
 
@@ -92,17 +95,6 @@ def safe_display(df, title):
 
 
 st.title("Stock Screener")
-
-# Apply custom CSS to adjust column width
-st.markdown("""
-    <style>
-        table { width: 100% !important; }
-        th, td { padding: 10px !important; text-align: left !important; }
-        td:nth-child(1) { min-width: 200px !important; }  /* Adjust first column width */
-        a { white-space: nowrap; }  /* Ensures links stay on one line */
-    </style>
-""", unsafe_allow_html=True)
-
 
 selected_list = st.selectbox("Select Stock List:", list(STOCK_LISTS.keys()))
 strategy = st.selectbox("Select Strategy:", ["3-5% Gainers", "3-5% Losers", "EMA, RSI & Support Zone"])
