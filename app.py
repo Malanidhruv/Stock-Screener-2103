@@ -50,7 +50,6 @@ def fetch_screened_stocks(tokens, strategy):
             return [res for res in results if res is not None]
 
         elif strategy == "EMA, RSI & Support Zone":
-            # analyze_all_tokens already uses threading
             return analyze_all_tokens(alice, tokens)
     except Exception as e:
         st.error(f"Error fetching stock data: {e}")
@@ -81,11 +80,18 @@ def clean_and_display_data(data, strategy):
 
 
 def safe_display(df, title):
+    """Displays the stock data with clickable TradingView links."""
     if df.empty:
         st.warning(f"No stocks found for {title}")
     else:
         st.markdown(f"## {title}")
-        st.dataframe(df)
+        
+        # Convert 'Name' column into clickable TradingView links
+        if "Name" in df.columns:
+            df["Name"] = df["Name"].apply(lambda x: f'<a href="https://in.tradingview.com/chart?symbol=NSE%3A{x}" target="_blank">{x}</a>')
+        
+        # Render the DataFrame with clickable links
+        st.markdown(df.to_html(escape=False), unsafe_allow_html=True)
 
 
 st.title("Stock Screener")
@@ -105,7 +111,6 @@ if st.button("Start Screening"):
             df = clean_and_display_data(screened_stocks, strategy)
             safe_display(df, strategy)
         elif strategy == "EMA, RSI & Support Zone":
-            # Sort by highest Strength and then by Distance% (ascending)
             sorted_signals = sorted(screened_stocks, key=lambda x: (-x.get('Strength', 0), x.get('Distance%', 0)))
             top_candidates = sorted_signals[:10]
             if top_candidates:
