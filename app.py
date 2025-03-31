@@ -96,6 +96,17 @@ def safe_display(df, title):
 
 st.title("Stock Screener")
 
+# Apply custom CSS to adjust column width
+st.markdown("""
+    <style>
+        table { width: 100% !important; }
+        th, td { padding: 10px !important; text-align: left !important; }
+        td:nth-child(1) { min-width: 200px !important; }  /* Adjust first column width */
+        a { white-space: nowrap; }  /* Ensures links stay on one line */
+    </style>
+""", unsafe_allow_html=True)
+
+
 selected_list = st.selectbox("Select Stock List:", list(STOCK_LISTS.keys()))
 strategy = st.selectbox("Select Strategy:", ["3-5% Gainers", "3-5% Losers", "EMA, RSI & Support Zone"])
 
