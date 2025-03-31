@@ -1,27 +1,26 @@
 import streamlit as st
 import pandas as pd
 import datetime
-import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from alice_client import initialize_alice, save_credentials, load_credentials
-from stock_analysis import analyze_all_tokens, fetch_stock_data_up, fetch_stock_data_down  # Import your analysis functions
+from stock_analysis import analyze_all_tokens, fetch_stock_data_up, fetch_stock_data_down
 from stock_lists import STOCK_LISTS
 
 st.set_page_config(page_title="Stock Screener", layout="wide")
-st.warning("This screener is based on statistical analysis. Please conduct your own due diligence before making any trading decisions. This application is best compatible with **Google Chrome**.")
+st.warning("This screener is based on statistical analysis. Please conduct your own due diligence before making any trading decisions. Best viewed on **Google Chrome**.")
 
-# Try loading stored credentials
+# Load stored credentials
 user_id, api_key = load_credentials()
-
 if not user_id or not api_key:
-    st.title("Admin Login - Enter AliceBlue API Credentials")
-    new_user_id = st.text_input("Enter User ID", type="password")  # Hide input
-    new_api_key = st.text_input("Enter API Key", type="password")  # Hide input
-
-    if st.button("Login"):
-        save_credentials(new_user_id, new_api_key)
-        st.success("API credentials saved! Refreshing...")
-        st.rerun()
+    with st.form("login_form"):
+        st.title("Admin Login - Enter AliceBlue API Credentials")
+        new_user_id = st.text_input("Enter User ID", type="password")
+        new_api_key = st.text_input("Enter API Key", type="password")
+        submitted = st.form_submit_button("Login")
+        if submitted:
+            save_credentials(new_user_id, new_api_key)
+            st.success("API credentials saved! Refreshing...")
+            st.rerun()
 
 try:
     alice = initialize_alice()
@@ -29,75 +28,47 @@ except Exception as e:
     st.error(f"Failed to initialize AliceBlue API: {e}")
     alice = None
 
-
 @st.cache_data(ttl=300)
 def fetch_screened_stocks(tokens, strategy):
-    """Fetch and analyze stocks based on selected strategy concurrently."""
+    if not alice:
+        return []
+    
     try:
-        if not alice:
-            raise Exception("AliceBlue API is not initialized.")
-        
-        if strategy == "3-5% Gainers":
-            with ThreadPoolExecutor(max_workers=10) as executor:
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            if strategy == "3-5% Gainers":
                 futures = {executor.submit(fetch_stock_data_up, alice, token): token for token in tokens}
-                results = [future.result() for future in as_completed(futures)]
-            return [res for res in results if res is not None]
-
-        elif strategy == "3-5% Losers":
-            with ThreadPoolExecutor(max_workers=10) as executor:
+            elif strategy == "3-5% Losers":
                 futures = {executor.submit(fetch_stock_data_down, alice, token): token for token in tokens}
-                results = [future.result() for future in as_completed(futures)]
+            else:
+                return analyze_all_tokens(alice, tokens)
+            
+            results = [future.result() for future in as_completed(futures)]
             return [res for res in results if res is not None]
-
-        elif strategy == "EMA, RSI & Support Zone":
-            return analyze_all_tokens(alice, tokens)
     except Exception as e:
         st.error(f"Error fetching stock data: {e}")
         return []
 
-
-def clean_and_display_data(data, strategy):
-    """Clean and convert the data into a DataFrame based on the strategy."""
-    if not data or not isinstance(data, list):
-        return pd.DataFrame()
-
-    if strategy in ["3-5% Gainers", "3-5% Losers"]:
-        df = pd.DataFrame(data)
-        df["Close"] = df["Close"].astype(float).round(2)
-        df["Change (%)"] = df["Change (%)"].astype(float).round(2)
-    else:
-        df = pd.DataFrame(data)
-        df["Price"] = df["Price"].astype(float).round(2)
-        df["Support"] = df["Support"].astype(float).round(2)
-        df["Distance%"] = df["Distance%"].astype(float).round(2)
-        df["RSI"] = df["RSI"].astype(float).round(2)
+def display_stock_data(data, strategy):
+    if not data:
+        st.warning(f"No stocks found for {strategy}")
+        return
+    
+    df = pd.DataFrame(data)
+    if "Name" in df.columns:
+        df.insert(1, "TradingView Link", df["Name"].apply(lambda x: f'https://in.tradingview.com/chart?symbol=NSE%3A{x}'))
     
     search = st.text_input("Search Stocks:", "").upper()
     if search and "Name" in df.columns:
         df = df[df["Name"].str.contains(search, na=False, regex=False)]
     
-    return df
-
-
-def safe_display(df, title):
-    """Displays the stock data with clickable TradingView links."""
-    if df.empty:
-        st.warning(f"No stocks found for {title}")
-    else:
-        st.markdown(f"## {title}")
-        
-        # Convert 'Name' column into clickable TradingView links
-        if "Name" in df.columns:
-            df["Name"] = df["Name"].apply(lambda x: f'<a href="https://in.tradingview.com/chart?symbol=NSE%3A{x}" target="_blank">{x}</a>')
-        
-        # Render the DataFrame with clickable links
-        st.markdown(df.to_html(escape=False), unsafe_allow_html=True)
-
+    st.dataframe(df, use_container_width=True)
 
 st.title("Stock Screener")
-
-selected_list = st.selectbox("Select Stock List:", list(STOCK_LISTS.keys()))
-strategy = st.selectbox("Select Strategy:", ["3-5% Gainers", "3-5% Losers", "EMA, RSI & Support Zone"])
+col1, col2 = st.columns(2)
+with col1:
+    selected_list = st.selectbox("Select Stock List:", list(STOCK_LISTS.keys()))
+with col2:
+    strategy = st.selectbox("Select Strategy:", ["3-5% Gainers", "3-5% Losers", "EMA, RSI & Support Zone"])
 
 if st.button("Start Screening"):
     tokens = STOCK_LISTS.get(selected_list, [])
@@ -106,19 +77,4 @@ if st.button("Start Screening"):
     else:
         with st.spinner("Fetching and analyzing stocks..."):
             screened_stocks = fetch_screened_stocks(tokens, strategy)
-        
-        if strategy in ["3-5% Gainers", "3-5% Losers"]:
-            df = clean_and_display_data(screened_stocks, strategy)
-            safe_display(df, strategy)
-        elif strategy == "EMA, RSI & Support Zone":
-            sorted_signals = sorted(screened_stocks, key=lambda x: (-x.get('Strength', 0), x.get('Distance%', 0)))
-            top_candidates = sorted_signals[:10]
-            if top_candidates:
-                df = pd.DataFrame(top_candidates)
-                df["Price"] = df["Price"].astype(float).round(2)
-                df["Support"] = df["Support"].astype(float).round(2)
-                df["Distance%"] = df["Distance%"].astype(float).round(2)
-                df["RSI"] = df["RSI"].astype(float).round(2)
-                safe_display(df, "Top Buy Candidates")
-            else:
-                st.warning("No stocks found for EMA, RSI & Support Zone strategy.")
+        display_stock_data(screened_stocks, strategy)
